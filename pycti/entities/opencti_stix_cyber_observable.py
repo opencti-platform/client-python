@@ -236,6 +236,7 @@ class StixCyberObservable(StixCyberObservableDeprecatedMixin):
     """
 
     def create(self, **kwargs):
+
         observable_data = kwargs.get("observableData", {})
         simple_observable_id = kwargs.get("simple_observable_id", None)
         simple_observable_key = kwargs.get("simple_observable_key", None)
@@ -269,37 +270,33 @@ class StixCyberObservable(StixCyberObservableDeprecatedMixin):
             )
         if type is None:
             return
-        if type.lower() == "file":
-            type = "StixFile"
-        elif type.lower() == "ipv4-addr":
-            type = "IPv4-Addr"
-        elif type.lower() == "ipv6-addr":
-            type = "IPv6-Addr"
-        elif type.lower() == "hostname" or type.lower() == "x-opencti-hostname":
-            type = "Hostname"
-        elif type.lower() == "payment-card" or type.lower() == "x-opencti-payment-card":
-            type = "Payment-Card"
-        elif type.lower() == "credential" or type.lower() == "x-opencti-credential":
-            type = "Credential"
-        elif (
-            type.lower() == "tracking-number"
-            or type.lower() == "x-opencti-tracking-number"
-        ):
-            type = "Tracking-Number"
-        elif (
-            type.lower() == "cryptocurrency-wallet"
-            or type.lower() == "x-opencti-cryptocurrency-wallet"
-        ):
-            type = "Cryptocurrency-Wallet"
-        elif type.lower() == "user-agent" or type.lower() == "x-opencti-user-agent":
-            type = "User-Agent"
-        elif (
-            type.lower() == "cryptographic-key"
-            or type.lower() == "x-opencti-cryptographic-key"
-        ):
-            type = "Cryptographic-Key"
-        elif type.lower() == "text" or type.lower() == "x-opencti-text":
-            type = "Text"
+
+        type_mappings = {
+            "credential": "Credential",
+            "cryptographic-key": "Cryptographic-Key",
+            "file": "StixFile",
+            "financial-account": "Financial-Account",
+            "financial-asset": "Financial-Asset",
+            "financial-transaction": "Financial-Transaction",
+            "hostname": "Hostname",
+            "ipv4-addr": "IPv4-Addr",
+            "ipv6-addr": "IPv6-Addr",
+            "payment-card": "Payment-Card",
+            "text": "Text",
+            "tracking-number": "Tracking-Number",
+            "user-agent": "User-Agent",
+            "x-opencti-credential": "Credential",
+            "x-opencti-cryptographic-key": "Cryptographic-Key",
+            "x-opencti-financial-account": "Financial-Account",
+            "x-opencti-financial-asset": "Financial-Asset",
+            "x-opencti-financial-transaction": "Financial-Transaction",
+            "x-opencti-hostname": "Hostname",
+            "x-opencti-payment-card": "Payment-Card",
+            "x-opencti-text": "Text",
+            "x-opencti-tracking-number": "Tracking-Number",
+            "x-opencti-user-agent": "User-Agent",
+        }
+        type = type_mappings.get(type.lower(), type)
 
         if "x_opencti_description" in observable_data:
             x_opencti_description = observable_data["x_opencti_description"]
@@ -401,12 +398,14 @@ class StixCyberObservable(StixCyberObservableDeprecatedMixin):
                     $Hostname: HostnameAddInput
                     $Text: TextAddInput,
                     $UserAgent: UserAgentAddInput
-                    $BankAccount: BankAccountAddInput
                     $PhoneNumber: PhoneNumberAddInput
                     $Credential: CredentialAddInput
                     $TrackingNumber: TrackingNumberAddInput
                     $PaymentCard: PaymentCardAddInput
                     $MediaContent: MediaContentAddInput
+                    $FinancialAccount: FinancialAccountAddInput
+                    $FinancialAsset: FinancialAssetAddInput
+                    $FinancialTransaction: FinancialTransactionAddInput
                 ) {
                     stixCyberObservableAdd(
                         type: $type,
@@ -445,12 +444,14 @@ class StixCyberObservable(StixCyberObservableDeprecatedMixin):
                         Hostname: $Hostname,
                         Text: $Text,
                         UserAgent: $UserAgent
-                        BankAccount: $BankAccount
                         PhoneNumber: $PhoneNumber
                         Credential: $Credential
                         TrackingNumber: $TrackingNumber
                         PaymentCard: $PaymentCard
                         MediaContent: $MediaContent
+                        FinancialAccount: $FinancialAccount
+                        FinancialAsset: $FinancialAsset
+                        FinancialTransaction: $FinancialTransaction
                     ) {
                         id
                         standard_id
@@ -953,18 +954,6 @@ class StixCyberObservable(StixCyberObservableDeprecatedMixin):
                         observable_data["value"] if "value" in observable_data else None
                     ),
                 }
-            elif type == "Bank-Account":
-                input_variables["BankAccount"] = {
-                    "iban": (
-                        observable_data["iban"] if "iban" in observable_data else None
-                    ),
-                    "bic": observable_data["bic"] if "bic" in observable_data else None,
-                    "account_number": (
-                        observable_data["account_number"]
-                        if "account_number" in observable_data
-                        else None
-                    ),
-                }
             elif type == "Phone-Number":
                 input_variables["PhoneNumber"] = {
                     "value": (
@@ -1012,25 +1001,6 @@ class StixCyberObservable(StixCyberObservableDeprecatedMixin):
                         else None
                     ),
                 }
-            elif type == "Payment-Card" or type.lower() == "x-opencti-payment-card":
-                input_variables["PaymentCard"] = {
-                    "card_number": (
-                        observable_data["card_number"]
-                        if "card_number" in observable_data
-                        else None
-                    ),
-                    "expiration_date": (
-                        observable_data["expiration_date"]
-                        if "expiration_date" in observable_data
-                        else None
-                    ),
-                    "cvv": observable_data["cvv"] if "cvv" in observable_data else None,
-                    "holder_name": (
-                        observable_data["holder_name"]
-                        if "holder_name" in observable_data
-                        else None
-                    ),
-                }
             elif (
                 type == "Cryptocurrency-Wallet"
                 or type.lower() == "x-opencti-cryptocurrency-wallet"
@@ -1054,6 +1024,37 @@ class StixCyberObservable(StixCyberObservableDeprecatedMixin):
                         observable_data["value"] if "value" in observable_data else None
                     ),
                 }
+            elif (
+                type == "Financial-Account"
+                or type.lower() == "x-opencti-financial-account"
+            ):
+                input_variables["FinancialAccount"] = {
+                    "iban": observable_data.get("iban"),
+                    "bic": observable_data.get("bic"),
+                    "account_number": observable_data.get("account_number"),
+                    "account_status": observable_data.get("account_status"),
+                    "account_type": observable_data.get("account_type"),
+                    "currency_code": observable_data.get("currency_code"),
+                }
+            elif (
+                type == "Financial-Asset" or type.lower() == "x-opencti-financial-asset"
+            ):
+                input_variables["FinancialAsset"] = {
+                    "asset_name": observable_data.get("asset_name"),
+                    "asset_type": observable_data.get("asset_type"),
+                    "asset_value": observable_data.get("asset_value"),
+                    "currency_code": observable_data.get("currency_code"),
+                }
+            elif (
+                type == "Financial-Transaction"
+                or type.lower() == "x-opencti-transaction"
+            ):
+                input_variables["FinancialTransaction"] = {
+                    "transaction_date": observable_data.get("transaction_date"),
+                    "transaction_value": observable_data.get("transaction_value"),
+                    "currency_code": observable_data.get("currency_code"),
+                }
+
             result = self.opencti.query(query, input_variables)
             if "payload_bin" in observable_data and "mime_type" in observable_data:
                 self.add_file(

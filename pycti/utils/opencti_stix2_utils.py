@@ -28,12 +28,15 @@ STIX_CYBER_OBSERVABLE_MAPPING = {
     "cryptocurrency-wallet": "Cryptocurrency-Wallet",
     "text": "Text",
     "user-agent": "User-Agent",
-    "bank-account": "Bank-Account",
+    # "bank-account": "Bank-Account",
     "phone-number": "Phone-Number",
     "credential": "Credential",
     "tracking-number": "Tracking-Number",
     "payment-card": "Payment-Card",
     "media-content": "Media-Content",
+    "financial-account": "Financial-Account",
+    "financial-asset": "Financial-Asset",
+    "financial-transaction": "Financial-Transaction",
 }
 
 PATTERN_MAPPING = {
@@ -60,12 +63,15 @@ PATTERN_MAPPING = {
     "Windows-Registry-Key": ["key"],
     "Windows-Registry-Value-Type": ["name"],
     "Hostname": ["value"],
-    "Bank-Account": ["iban"],
+    # "Bank-Account": ["iban"],
     "Phone-Number": ["value"],
     "Payment-Card": ["card_number"],
     "Tracking-Number": ["value"],
     "Credential": ["value"],
     "Media-Content": ["url"],
+    "Financial-Account": ["account_number"],
+    "Financial-Asset": ["asset_value"],
+    "Financial-Transaction": ["transaction_value"],
 }
 
 OBSERVABLES_VALUE_INT = [
