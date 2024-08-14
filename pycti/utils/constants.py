@@ -38,9 +38,12 @@ class StixCyberObservableTypes(Enum):
     HOSTNAME = "Hostname"
     CRYPTOGRAPHIC_KEY = "Cryptographic-Key"
     CRYPTOCURRENCY_WALLET = "Cryptocurrency-Wallet"
+    FINANCIAL_ACCOUNT = "Financial-Account"
+    FINANCIAL_ASSET = "Financial-Asset"
+    FINANCIAL_TRANSACTION = "Financial-Transaction"
     TEXT = "Text"
     USER_AGENT = "User-Agent"
-    BANK_ACCOUNT = "Bank-Account"
+    # BANK_ACCOUNT = "Bank-Account"
     PHONE_NUMBER = "Phone-Number"
     CREDENTIAL = "Credential"
     TRACKING_NUMBER = "Tracking-Number"
@@ -308,27 +311,27 @@ class CustomObservablePaymentCard:
     pass
 
 
-@CustomObservable(
-    "bank-account",
-    [
-        ("value", StringProperty(required=True)),
-        ("iban", StringProperty(required=True)),
-        ("bic", StringProperty(required=False)),
-        ("account_number", StringProperty(required=False)),
-        ("spec_version", StringProperty(fixed="2.1")),
-        (
-            "object_marking_refs",
-            ListProperty(
-                ReferenceProperty(valid_types="marking-definition", spec_version="2.1")
-            ),
-        ),
-    ],
-    ["iban"],
-)
-class CustomObservableBankAccount:
-    """Bank Account observable."""
+# @CustomObservable(
+#     "bank-account",
+#     [
+#         ("value", StringProperty(required=True)),
+#         ("iban", StringProperty(required=True)),
+#         ("bic", StringProperty(required=False)),
+#         ("account_number", StringProperty(required=False)),
+#         ("spec_version", StringProperty(fixed="2.1")),
+#         (
+#             "object_marking_refs",
+#             ListProperty(
+#                 ReferenceProperty(valid_types="marking-definition", spec_version="2.1")
+#             ),
+#         ),
+#     ],
+#     ["iban"],
+# )
+# class CustomObservableBankAccount:
+#     """Bank Account observable."""
 
-    pass
+#     pass
 
 
 @CustomObservable(
@@ -367,8 +370,6 @@ class CustomObservableCredential:
 )
 class CustomObservableCryptocurrencyWallet:
     """Cryptocurrency wallet observable."""
-
-    pass
 
 
 @CustomObservable(
@@ -452,5 +453,72 @@ class CustomObservableUserAgent:
 )
 class CustomObservableMediaContent:
     """Media-Content observable."""
+
+    pass
+
+
+@CustomObservable(
+    "financial-account",
+    [
+        ("account_number", StringProperty()),
+        ("account_status", StringProperty()),
+        ("account_type", StringProperty()),
+        ("iban", StringProperty()),
+        ("bic", StringProperty()),
+        ("currency_code", StringProperty()),
+        ("spec_version", StringProperty(fixed="2.1")),
+        (
+            "object_marking_refs",
+            ListProperty(
+                ReferenceProperty(valid_types="marking-definition", spec_version="2.1")
+            ),
+        ),
+    ],
+)
+class CustomObservableFinancialAccount:
+    """Financial account observable."""
+
+    pass
+
+
+@CustomObservable(
+    "financial-asset",
+    [
+        ("asset_name", StringProperty()),
+        ("asset_type", StringProperty()),
+        ("asset_value", StringProperty()),
+        ("currency_code", StringProperty()),
+        ("spec_version", StringProperty(fixed="2.1")),
+        (
+            "object_marking_refs",
+            ListProperty(
+                ReferenceProperty(valid_types="marking-definition", spec_version="2.1")
+            ),
+        ),
+    ],
+)
+class CustomObservableFinancialAsset:
+    """Financial asset observable."""
+
+    pass
+
+
+@CustomObservable(
+    "financial-transaction",
+    [
+        ("transaction_date", StringProperty()),
+        ("transaction_value", StringProperty()),
+        ("currency_code", StringProperty()),
+        ("spec_version", StringProperty(fixed="2.1")),
+        (
+            "object_marking_refs",
+            ListProperty(
+                ReferenceProperty(valid_types="marking-definition", spec_version="2.1")
+            ),
+        ),
+    ],
+)
+class CustomObservableFinancialTransaction:
+    """Financial transaction observable."""
 
     pass

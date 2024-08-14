@@ -261,11 +261,6 @@ SCO_PROPERTIES = """
     ... on UserAgent {
         value
     }
-    ... on BankAccount {
-        iban
-        bic
-        account_number
-    }
     ... on PhoneNumber {
         value
     }
@@ -287,6 +282,25 @@ SCO_PROPERTIES = """
         media_category
         url
         publication_date
+    }
+    ... on FinancialAccount {
+        account_number
+        account_status
+        account_type
+        iban
+        bic
+        currency_code
+    }
+    ... on FinancialAsset {
+        asset_name
+        asset_type
+        asset_value
+        currency_code
+    }
+    ... on FinancialTransaction {
+        transaction_date
+        transaction_value
+        currency_code
     }
 """
 SCO_PROPERTIES_WITH_FILES = """
@@ -561,11 +575,6 @@ SCO_PROPERTIES_WITH_FILES = """
     ... on UserAgent {
         value
     }
-    ... on BankAccount {
-        iban
-        bic
-        account_number
-    }
     ... on PhoneNumber {
         value
     }
@@ -600,5 +609,24 @@ SCO_PROPERTIES_WITH_FILES = """
                 }
             }
         }
+    }
+    ... on FinancialAccount {
+        account_number
+        account_status
+        account_type
+        iban
+        bic
+        currency_code
+    }
+    ... on FinancialAsset {
+        asset_name
+        asset_type
+        asset_value
+        currency_code
+    }
+    ... on FinancialTransaction {
+        transaction_date
+        transaction_value
+        currency_code
     }
 """
