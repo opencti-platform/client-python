@@ -106,16 +106,38 @@ class Indicator:
             final_data = []
             data = self.opencti.process_multiple(result["data"]["indicators"])
             self.opencti.app_logger.info(
-                "Listing Indicators with filters", {"filters": json.dumps(filters), "search": search, "first": first, "after": after, "orderBy": order_by, "orderMode": order_mode}
+                "Listing Indicators with filters",
+                {
+                    "filters": json.dumps(filters),
+                    "search": search,
+                    "first": first,
+                    "after": after,
+                    "orderBy": order_by,
+                    "orderMode": order_mode,
+                },
             )
             final_data = final_data + data
             self.opencti.app_logger.info(
-                "Listing Indicators has next page", {"hasNextPage": result["data"]["indicators"]["pageInfo"]["hasNextPage"]}
+                "Listing Indicators has next page",
+                {
+                    "hasNextPage": result["data"]["indicators"]["pageInfo"][
+                        "hasNextPage"
+                    ],
+                    "data": json.dump(result),
+                },
             )
             while result["data"]["indicators"]["pageInfo"]["hasNextPage"]:
                 after = result["data"]["indicators"]["pageInfo"]["endCursor"]
                 self.opencti.app_logger.info(
-                    "Listing Indicators with filters", {"filters": json.dumps(filters), "search": search, "first": first, "after": after, "orderBy": order_by, "orderMode": order_mode}
+                    "Listing Indicators with filters",
+                    {
+                        "filters": json.dumps(filters),
+                        "search": search,
+                        "first": first,
+                        "after": after,
+                        "orderBy": order_by,
+                        "orderMode": order_mode,
+                    },
                 )
                 result = self.opencti.query(
                     query,
@@ -130,7 +152,13 @@ class Indicator:
                 )
                 data = self.opencti.process_multiple(result["data"]["indicators"])
                 self.opencti.app_logger.info(
-                    "Listing Indicators has next page", {"hasNextPage": result["data"]["indicators"]["pageInfo"]["hasNextPage"], "data": json.dump(data)}
+                    "Listing Indicators has next page",
+                    {
+                        "hasNextPage": result["data"]["indicators"]["pageInfo"][
+                            "hasNextPage"
+                        ],
+                        "data": json.dump(result),
+                    },
                 )
                 final_data = final_data + data
             return final_data
