@@ -123,7 +123,7 @@ class Indicator:
                     "hasNextPage": result["data"]["indicators"]["pageInfo"][
                         "hasNextPage"
                     ],
-                    "data": json.dump(result),
+                    "data": json.dumps(result),
                 },
             )
             while result["data"]["indicators"]["pageInfo"]["hasNextPage"]:
@@ -157,7 +157,7 @@ class Indicator:
                         "hasNextPage": result["data"]["indicators"]["pageInfo"][
                             "hasNextPage"
                         ],
-                        "data": json.dump(result),
+                        "data": json.dumps(result),
                     },
                 )
                 final_data = final_data + data
