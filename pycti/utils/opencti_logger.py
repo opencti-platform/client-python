@@ -1,6 +1,8 @@
 import datetime
 import logging
+import os
 
+from pygelf import GelfTcpHandler, GelfUdpHandler
 from pythonjsonlogger import jsonlogger
 
 
@@ -17,7 +19,30 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
             log_record["level"] = record.levelname
 
 
-def logger(level, json_logging=True):
+class ContextFilter(logging.Filter):
+    def __init__(self, context_vars):
+        """
+        :param context_vars: the extra properties to add to the LogRecord
+        :type context_vars: list[tuple[str, str]]
+        """
+        super().__init__()
+        self.context_vars = context_vars
+
+    def filter(self, record):
+        for key, value in self.context_vars:
+            setattr(record, key, value)
+        return True
+
+
+def logger(
+    level,
+    json_logging=True,
+    graylog_host=None,
+    graylog_port=None,
+    graylog_adapter=None,
+    log_shipping_level=None,
+    log_shipping_env_var_prefix=None,
+):
     # Exceptions
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("pika").setLevel(logging.ERROR)
@@ -30,6 +55,28 @@ def logger(level, json_logging=True):
         logging.basicConfig(handlers=[log_handler], level=level, force=True)
     else:
         logging.basicConfig(level=level)
+
+    if graylog_host is not None:
+        if graylog_adapter == "tcp":
+            shipping_handler = GelfTcpHandler(
+                host=graylog_host, port=graylog_port, include_extra_fields=True
+            )
+        else:
+            shipping_handler = GelfUdpHandler(
+                host=graylog_host, port=graylog_port, include_extra_fields=True
+            )
+        shipping_handler.setLevel(log_shipping_level)
+
+        if log_shipping_env_var_prefix is not None:
+            filtered_env = [
+                (k.removeprefix(log_shipping_env_var_prefix), v)
+                for k, v in os.environ.items()
+                if k.startswith(log_shipping_env_var_prefix)
+            ]
+            shipping_filter = ContextFilter(filtered_env)
+            shipping_handler.addFilter(shipping_filter)
+
+        logging.getLogger().addHandler(shipping_handler)
 
     class AppLogger:
         def __init__(self, name):

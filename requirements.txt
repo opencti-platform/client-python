@@ -16,3 +16,4 @@ deprecation~=2.1.0
 # OpenCTI
 filigran-sseclient~=1.0.0
 stix2~=3.0.1
+pygelf~=0.4.2

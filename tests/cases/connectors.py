@@ -63,6 +63,7 @@ class ExternalImportConnector:
         os.environ["OPENCTI_JSON_LOGGING"] = "true"
         os.environ["CONNECTOR_EXPOSE_METRICS"] = "true"
         os.environ["CONNECTOR_METRICS_PORT"] = "9096"
+        os.environ["GRAYLOG_DUMMY_VAR"] = "dummy_value"
 
         config = (
             yaml.load(open(config_file_path), Loader=yaml.FullLoader)

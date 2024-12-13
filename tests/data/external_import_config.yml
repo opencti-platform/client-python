@@ -6,6 +6,11 @@ connector:
   confidence_level: 80 # From 0 (Unknown) to 100 (Fully trusted)
   update_existing_data: True
   log_level: 'debug'
+  graylog_host: '127.0.0.1'
+  graylog_port: 12201
+  graylog_adapter: 'tcp'
+  log_shipping_level: 'warn'
+  log_shipping_env_var_prefix: 'GRAYLOG_'
 
 test:
   interval: 1

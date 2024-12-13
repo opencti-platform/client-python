@@ -98,6 +98,18 @@ class OpenCTIApiClient:
     :type cert: str, tuple, optional
     :param auth: Add a AuthBase class with custom authentication for you OpenCTI infrastructure.
     :type auth: requests.auth.AuthBase, optional
+    :param graylog_host: Graylog host name or IP address
+    :type graylog_host: str, optional
+    :param graylog_port: Graylog port
+    :type graylog_port: int, optional
+    :param graylog_adapter: the Graylog adapter to use. Valid values are "udp" and "tcp". Uses UDP by default.
+    :type graylog_adapter: str, optional
+    :param log_shipping_level: log level when shipping logs remotely
+    :type log_shipping_level: str, optional
+    :param log_shipping_env_var_prefix: The prefix used to match environment variables. Matching variables will be added
+        as meta info to the log data. The value of this property will be stripped from the name of the environment
+        variable.
+    :type log_shipping_env_var_prefix: str, optional
     """
 
     def __init__(
@@ -112,6 +124,11 @@ class OpenCTIApiClient:
         cert=None,
         auth=None,
         perform_health_check=True,
+        graylog_host=None,
+        graylog_port=None,
+        graylog_adapter=None,
+        log_shipping_level=None,
+        log_shipping_env_var_prefix=None,
     ):
         """Constructor method"""
 
@@ -126,7 +143,15 @@ class OpenCTIApiClient:
             raise ValueError("A TOKEN must be set")
 
         # Configure logger
-        self.logger_class = logger(log_level.upper(), json_logging)
+        self.logger_class = logger(
+            log_level.upper(),
+            json_logging,
+            graylog_host,
+            graylog_port,
+            graylog_adapter,
+            log_shipping_level.upper() if log_shipping_level is not None else None,
+            log_shipping_env_var_prefix,
+        )
         self.app_logger = self.logger_class("api")
 
         # Define API

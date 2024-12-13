@@ -886,6 +886,29 @@ class OpenCTIConnectorHelper:  # pylint: disable=too-many-public-methods
         self.log_level = get_config_variable(
             "CONNECTOR_LOG_LEVEL", ["connector", "log_level"], config, default="INFO"
         ).upper()
+        self.graylog_host = get_config_variable(
+            "CONNECTOR_GRAYLOG_HOST", ["connector", "graylog_host"], config
+        )
+        self.graylog_port = get_config_variable(
+            "CONNECTOR_GRAYLOG_PORT", ["connector", "graylog_port"], config, True, 12201
+        )
+        self.graylog_adapter = get_config_variable(
+            "CONNECTOR_GRAYLOG_ADAPTER",
+            ["connector", "graylog_adapter"],
+            config,
+            default="udp",
+        )
+        self.log_shipping_level = get_config_variable(
+            "CONNECTOR_LOG_SHIPPING_LEVEL",
+            ["connector", "log_shipping_level"],
+            config,
+            default="INFO",
+        ).upper()
+        self.log_shipping_env_var_prefix = get_config_variable(
+            "CONNECTOR_LOG_SHIPPING_ENV_VAR_PREFIX",
+            ["connector", "log_shipping_env_var_prefix"],
+            config,
+        )
         self.connect_run_and_terminate = get_config_variable(
             "CONNECTOR_RUN_AND_TERMINATE",
             ["connector", "run_and_terminate"],
@@ -923,6 +946,11 @@ class OpenCTIConnectorHelper:  # pylint: disable=too-many-public-methods
             self.opencti_ssl_verify,
             json_logging=self.opencti_json_logging,
             bundle_send_to_queue=self.bundle_send_to_queue,
+            graylog_host=self.graylog_host,
+            graylog_port=self.graylog_port,
+            graylog_adapter=self.graylog_adapter,
+            log_shipping_level=self.log_shipping_level,
+            log_shipping_env_var_prefix=self.log_shipping_env_var_prefix,
         )
         # - Impersonate API that will use applicant id
         # Behave like standard api if applicant not found
@@ -933,6 +961,11 @@ class OpenCTIConnectorHelper:  # pylint: disable=too-many-public-methods
             self.opencti_ssl_verify,
             json_logging=self.opencti_json_logging,
             bundle_send_to_queue=self.bundle_send_to_queue,
+            graylog_host=self.graylog_host,
+            graylog_port=self.graylog_port,
+            graylog_adapter=self.graylog_adapter,
+            log_shipping_level=self.log_shipping_level,
+            log_shipping_env_var_prefix=self.log_shipping_env_var_prefix,
         )
         self.connector_logger = self.api.logger_class(self.connect_name)
         # For retro compatibility
