@@ -315,12 +315,16 @@ class Group:
         )
         return self.opencti.process_multiple_fields(result["data"]["groupAdd"])
 
-    def delete(self, id: str):
+    def delete(self, **kwargs):
         """Delete a given group from OpenCTI
 
         :param id: ID of the group to delete.
         :type id: str
         """
+        id = kwargs.get("id", None)
+        if id is None:
+            self.opencti.admin_logger.error("[opencti_user] Missing parameter: id")
+            return None
         self.opencti.admin_logger.info("Deleting group", {"id": id})
         query = """
             mutation GroupDelete($id: ID!) {

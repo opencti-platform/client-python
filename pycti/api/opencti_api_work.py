@@ -128,6 +128,20 @@ class OpenCTIApiWork:
         )
         return work["data"]
 
+    def delete(self, **kwargs):
+        id = kwargs.get("id", None)
+        query = """
+        mutation ConnectorWorksMutation($workId: ID!) {
+            workEdit(id: $workId) {
+                delete
+            }
+        }"""
+        work = self.api.query(
+            query,
+            {"workId": id},
+        )
+        return work["data"]
+
     def wait_for_work_to_finish(self, work_id: str):
         status = ""
         cnt = 0

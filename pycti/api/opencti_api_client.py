@@ -10,8 +10,12 @@ import requests
 
 from pycti import __version__
 from pycti.api.opencti_api_connector import OpenCTIApiConnector
+from pycti.api.opencti_api_draft import OpenCTIApiDraft
 from pycti.api.opencti_api_playbook import OpenCTIApiPlaybook
+from pycti.api.opencti_api_public_dashboard import OpenCTIApiPublicDashboard
+from pycti.api.opencti_api_trash import OpenCTIApiTrash
 from pycti.api.opencti_api_work import OpenCTIApiWork
+from pycti.api.opencti_api_workspace import OpenCTIApiWorkspace
 from pycti.entities.opencti_attack_pattern import AttackPattern
 from pycti.entities.opencti_campaign import Campaign
 from pycti.entities.opencti_capability import Capability
@@ -151,6 +155,10 @@ class OpenCTIApiClient:
 
         # Define the dependencies
         self.work = OpenCTIApiWork(self)
+        self.trash = OpenCTIApiTrash(self)
+        self.draft = OpenCTIApiDraft(self)
+        self.workspace = OpenCTIApiWorkspace(self)
+        self.public_dashboard = OpenCTIApiPublicDashboard(self)
         self.playbook = OpenCTIApiPlaybook(self)
         self.connector = OpenCTIApiConnector(self)
         self.stix2 = OpenCTIStix2(self)

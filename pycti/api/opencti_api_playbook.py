@@ -32,3 +32,17 @@ class OpenCTIApiPlaybook:
                 "bundle": bundle,
             },
         )
+
+    def delete(self, **kwargs):
+        id = kwargs.get("id", None)
+        query = """
+            mutation PlaybookDelete($id: ID!) {
+                playbookDelete(id: $id)
+            }
+           """
+        self.api.query(
+            query,
+            {
+                "id": id,
+            },
+        )
