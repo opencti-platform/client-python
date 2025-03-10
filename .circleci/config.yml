@@ -3,6 +3,8 @@ version: 2.1
 orbs:
   slack: circleci/slack@4.15.0
   ms-teams: cloudradar-monitoring/ms-teams@0.0.1
+env:
+  BASE_REPO: opencti
 jobs:
   ensure_formatting:
     docker:
@@ -48,7 +50,57 @@ jobs:
       - ms-teams/report:
           only_on_fail: true
           webhook_url: $MS_TEAMS_WEBHOOK_URL
-  build:
+  build-container-python-3-11:
+    docker:
+      - image: cimg/base:stable-20.04
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build opencti/python-client-container
+          command: |
+            docker run --privileged --rm tonistiigi/binfmt --install all
+            CIRCLE_TAG=${CIRCLE_TAG:-nightly}
+            echo "CIRCLE_TAG=${CIRCLE_TAG}"
+            echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            docker buildx create --platform linux/amd64,linux/arm64 --use --name mybuilder || true
+            docker buildx inspect mybuilder --bootstrap            
+            docker buildx build . \
+              --platform linux/amd64,linux/arm64 \
+              -t ${{ env.BASE_REPO }}/client-python-3-11:${CIRCLE_TAG} \
+              -t ${{ env.BASE_REPO }}client-python-3-11:latest \
+              --build-arg BASE_IMAGE="python:3.11-alpine3.20" 
+
+      - run:
+          name: Push image to regsitry
+          command: docker push ${{ env.BASE_REPO }}/client-python-3-11:latest --all-tags
+
+  build-container-python-3-12:
+    docker:
+      - image: cimg/base:stable-20.04
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build opencti/python-client
+          command: |
+            docker run --privileged --rm tonistiigi/binfmt --install all
+            CIRCLE_TAG=${CIRCLE_TAG:-nightly}
+            echo "CIRCLE_TAG=${CIRCLE_TAG}"
+            echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
+            docker buildx create --platform linux/amd64,linux/arm64 --use --name mybuilder || true
+            docker buildx inspect mybuilder --bootstrap
+            docker buildx build . \
+              --platform linux/amd64,linux/arm64 \
+              -t ${{ env.BASE_REPO }}/client-python-3-12:${CIRCLE_TAG} \
+              -t ${{ env.BASE_REPO }}/client-python-3-12:latest \
+              --build-arg BASE_IMAGE="python:3.12-alpine3.20" 
+
+      - run:
+          name: Push image to regsitry
+          command: docker push ${{ env.BASE_REPO }}/client-python-3-12:latest --all-tags
+
+  build-library:
     working_directory: ~/opencti-client
     docker:
       - image: cimg/python:3.12
@@ -144,18 +196,27 @@ workflows:
           filters:
             tags:
               only: /.*/
-      - build:
+      - build-container-python-3-11:
+          requires:
+            - build-library
+          filters:
+            tags:
+              only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)?\.?(\w)*/
+      - build-container-python-3-12:
+          requires:
+            - build-library
+          filters:
+            tags:
+              only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)?\.?(\w)*/
+      - build-library:
           filters:
             tags:
               only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)?\.?(\w)*/
             branches:
               ignore: /.*/
-          requires:
-            - ensure_formatting
-            - linter
       - deploy:
           requires:
-            - build
+            - build-library
           filters:
             tags:
               only: /[0-9]+(\.[0-9]+)+(\.[0-9]+)?\.?(\w)*/
@@ -163,7 +224,7 @@ workflows:
               ignore: /.*/
       - notify_rolling:
           requires:
-            - build
+            - build-library
       - notify:
           requires:
             - deploy
