@@ -18,6 +18,8 @@ from queue import Queue
 from typing import Callable, Dict, List, Optional, Union
 
 import pika
+import uvicorn
+from fastapi import FastAPI, Request
 from filigran_sseclient import SSEClient
 from pika.exceptions import NackError, UnroutableError
 from pydantic import TypeAdapter
@@ -30,6 +32,8 @@ from pycti.utils.opencti_stix2_splitter import OpenCTIStix2Splitter
 TRUTHY: List[str] = ["yes", "true", "True"]
 FALSY: List[str] = ["no", "false", "False"]
 
+app = FastAPI()
+
 
 def killProgramHook(etype, value, tb):
     os.kill(os.getpid(), signal.SIGTERM)
@@ -41,7 +45,7 @@ def start_loop(loop):
 
 
 def get_config_variable(
-    env_var: str,
+    env_var: Union[str, List[str]],
     yaml_path: List,
     config: Dict = {},
     isNumber: Optional[bool] = False,
@@ -57,8 +61,17 @@ def get_config_variable(
     :param default: default value
     """
 
-    if os.getenv(env_var) is not None:
-        result = os.getenv(env_var)
+    # Get env var
+    env_result = None
+    env_vars = env_var if type(env_var) is list else [env_var]
+    for var in env_vars:
+        if os.getenv(var) is not None:
+            env_result = os.getenv(var)
+            break
+
+    # If env not found check in config file
+    if env_result is not None:
+        result = env_result
     elif yaml_path is not None:
         if yaml_path[0] in config and yaml_path[1] in config[yaml_path[0]]:
             result = config[yaml_path[0]][yaml_path[1]]
@@ -141,6 +154,35 @@ def ssl_cert_chain(ssl_context, cert_data, key_data, passphrase):
         os.unlink(key_file_path)
 
 
+def create_callback_ssl_context(config) -> ssl.SSLContext:
+    listen_protocol_api_ssl_key = get_config_variable(
+        "LISTEN_PROTOCOL_API_SSL_KEY",
+        ["connector", "listen_protocol_api_ssl_key"],
+        config,
+        default="",
+    )
+    listen_protocol_api_ssl_cert = get_config_variable(
+        "LISTEN_PROTOCOL_API_SSL_CERT",
+        ["connector", "listen_protocol_api_ssl_cert"],
+        config,
+        default="",
+    )
+    listen_protocol_api_ssl_passphrase = get_config_variable(
+        "LISTEN_PROTOCOL_API_SSL_PASSPHRASE",
+        ["connector", "listen_protocol_api_ssl_passphrase"],
+        config,
+        default="",
+    )
+    ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+    ssl_cert_chain(
+        ssl_context,
+        listen_protocol_api_ssl_cert,
+        listen_protocol_api_ssl_key,
+        listen_protocol_api_ssl_passphrase,
+    )
+    return ssl_context
+
+
 def create_mq_ssl_context(config) -> ssl.SSLContext:
     use_ssl_ca = get_config_variable("MQ_USE_SSL_CA", ["mq", "use_ssl_ca"], config)
     use_ssl_cert = get_config_variable(
@@ -183,9 +225,14 @@ class ListenQueue(threading.Thread):
     def __init__(
         self,
         helper,
+        opencti_token,
         config: Dict,
         connector_config: Dict,
         applicant_id,
+        listen_protocol,
+        listen_protocol_api_ssl,
+        listen_protocol_api_path,
+        listen_protocol_api_port,
         callback,
     ) -> None:
         threading.Thread.__init__(self)
@@ -196,6 +243,11 @@ class ListenQueue(threading.Thread):
         self.helper = helper
         self.callback = callback
         self.config = config
+        self.opencti_token = opencti_token
+        self.listen_protocol = listen_protocol
+        self.listen_protocol_api_ssl = listen_protocol_api_ssl
+        self.listen_protocol_api_path = listen_protocol_api_path
+        self.listen_protocol_api_port = listen_protocol_api_port
         self.connector_applicant_id = applicant_id
         self.host = connector_config["connection"]["host"]
         self.vhost = connector_config["connection"]["vhost"]
@@ -375,52 +427,103 @@ class ListenQueue(threading.Thread):
                         "Failing reporting the processing"
                     )
 
+    async def _process_callback(self, request: Request):
+        # 01. Check the authentication
+        try:
+            authorization: str = request.headers.get("Authorization")
+            scheme, token = authorization.split()
+            if scheme.lower() != "bearer" or token != self.opencti_token:
+                return {"error": "Invalid credentials"}
+        except Exception:
+            return {"error": "Invalid credentials"}
+        # 02. Parse the data and execute
+        try:
+            data = await request.json()  # Get the JSON payload
+        except Exception as e:
+            return {"error": "Invalid JSON payload", "details": str(e)}
+        try:
+            self._data_handler(data)
+        except Exception as e:
+            return {"error": "Error processing message", "details": str(e)}
+        # all good
+        return {"message": "Message successfully processed"}
+
     def run(self) -> None:
-        self.helper.connector_logger.info("Starting ListenQueue thread")
-        while not self.exit_event.is_set():
-            try:
-                self.helper.connector_logger.info("ListenQueue connecting to rabbitMq.")
-                # Connect the broker
-                self.pika_credentials = pika.PlainCredentials(self.user, self.password)
-                self.pika_parameters = pika.ConnectionParameters(
-                    heartbeat=10,
-                    blocked_connection_timeout=30,
-                    host=self.host,
-                    port=self.port,
-                    virtual_host=self.vhost,
-                    credentials=self.pika_credentials,
-                    ssl_options=(
-                        pika.SSLOptions(create_mq_ssl_context(self.config), self.host)
-                        if self.use_ssl
-                        else None
-                    ),
-                )
-                self.pika_connection = pika.BlockingConnection(self.pika_parameters)
-                self.channel = self.pika_connection.channel()
+        if self.listen_protocol == "AMQP":
+            self.helper.connector_logger.info("Starting ListenQueue thread")
+            while not self.exit_event.is_set():
                 try:
-                    # confirm_delivery is only for cluster mode rabbitMQ
-                    # when not in cluster mode this line raise an exception
-                    self.channel.confirm_delivery()
-                except Exception as err:  # pylint: disable=broad-except
-                    self.helper.connector_logger.debug(str(err))
-                self.channel.basic_qos(prefetch_count=1)
-                assert self.channel is not None
-                self.channel.basic_consume(
-                    queue=self.queue_name, on_message_callback=self._process_message
-                )
-                self.channel.start_consuming()
-            except Exception as err:  # pylint: disable=broad-except
-                try:
-                    self.pika_connection.close()
-                except Exception as errInException:
-                    self.helper.connector_logger.debug(
-                        type(errInException).__name__, {"reason": str(errInException)}
+                    self.helper.connector_logger.info(
+                        "ListenQueue connecting to rabbitMq."
                     )
-                self.helper.connector_logger.error(
-                    type(err).__name__, {"reason": str(err)}
-                )
-                # Wait some time and then retry ListenQueue again.
-                time.sleep(10)
+                    # Connect the broker
+                    self.pika_credentials = pika.PlainCredentials(
+                        self.user, self.password
+                    )
+                    self.pika_parameters = pika.ConnectionParameters(
+                        heartbeat=10,
+                        blocked_connection_timeout=30,
+                        host=self.host,
+                        port=self.port,
+                        virtual_host=self.vhost,
+                        credentials=self.pika_credentials,
+                        ssl_options=(
+                            pika.SSLOptions(
+                                create_mq_ssl_context(self.config), self.host
+                            )
+                            if self.use_ssl
+                            else None
+                        ),
+                    )
+                    self.pika_connection = pika.BlockingConnection(self.pika_parameters)
+                    self.channel = self.pika_connection.channel()
+                    try:
+                        # confirm_delivery is only for cluster mode rabbitMQ
+                        # when not in cluster mode this line raise an exception
+                        self.channel.confirm_delivery()
+                    except Exception as err:  # pylint: disable=broad-except
+                        self.helper.connector_logger.debug(str(err))
+                    self.channel.basic_qos(prefetch_count=1)
+                    assert self.channel is not None
+                    self.channel.basic_consume(
+                        queue=self.queue_name, on_message_callback=self._process_message
+                    )
+                    self.channel.start_consuming()
+                except Exception as err:  # pylint: disable=broad-except
+                    try:
+                        self.pika_connection.close()
+                    except Exception as errInException:
+                        self.helper.connector_logger.debug(
+                            type(errInException).__name__,
+                            {"reason": str(errInException)},
+                        )
+                    self.helper.connector_logger.error(
+                        type(err).__name__, {"reason": str(err)}
+                    )
+                    # Wait some time and then retry ListenQueue again.
+                    time.sleep(10)
+        elif self.listen_protocol == "API":
+            self.helper.connector_logger.info("Starting Listen HTTP thread")
+            app.add_api_route(
+                self.listen_protocol_api_path, self._process_callback, methods=["POST"]
+            )
+            config = uvicorn.Config(
+                app,
+                host="0.0.0.0",
+                port=self.listen_protocol_api_port,
+                reload=False,
+                log_config=None,
+                log_level=None,
+            )
+            config.load()  # Manually calling the .load() to trigger needed actions outside HTTPS
+            if self.listen_protocol_api_ssl:
+                ssl_ctx = create_callback_ssl_context(self.config)
+                config.ssl = ssl_ctx
+            server = uvicorn.Server(config)
+            server.run()
+
+        else:
+            raise ValueError("Unsupported listen protocol type")
 
     def stop(self):
         self.helper.connector_logger.info("Preparing ListenQueue for clean shutdown")
@@ -790,8 +893,45 @@ class OpenCTIConnectorHelper:  # pylint: disable=too-many-public-methods
         self.connect_id = get_config_variable(
             "CONNECTOR_ID", ["connector", "id"], config
         )
+        self.listen_protocol = get_config_variable(
+            "CONNECTOR_LISTEN_PROTOCOL",
+            ["connector", "listen_protocol"],
+            config,
+            default="AMQP",
+        ).upper()
+        self.listen_protocol_api_port = get_config_variable(
+            "CONNECTOR_LISTEN_PROTOCOL_API_PORT",
+            ["connector", "listen_protocol_api_port"],
+            config,
+            default=7070,
+        )
+        self.listen_protocol_api_path = get_config_variable(
+            "CONNECTOR_LISTEN_PROTOCOL_API_PATH",
+            ["connector", "listen_protocol_api_path"],
+            config,
+            default="/api/callback",
+        )
+        self.listen_protocol_api_ssl = get_config_variable(
+            "CONNECTOR_LISTEN_PROTOCOL_API_SSL",
+            ["connector", "listen_protocol_api_ssl"],
+            config,
+            default=False,
+        )
+        self.listen_protocol_api_uri = get_config_variable(
+            "CONNECTOR_LISTEN_PROTOCOL_API_URI",
+            ["connector", "listen_protocol_api_uri"],
+            config,
+            default=(
+                "https://127.0.0.1:7070"
+                if self.listen_protocol_api_ssl
+                else "http://127.0.0.1:7070"
+            ),
+        )
         self.queue_protocol = get_config_variable(
-            "QUEUE_PROTOCOL", ["connector", "queue_protocol"], config, default="amqp"
+            ["QUEUE_PROTOCOL", "CONNECTOR_QUEUE_PROTOCOL"],
+            ["connector", "queue_protocol"],
+            config,
+            default="amqp",
         )
         self.connect_type = get_config_variable(
             "CONNECTOR_TYPE", ["connector", "type"], config
@@ -957,6 +1097,7 @@ class OpenCTIConnectorHelper:  # pylint: disable=too-many-public-methods
             self.connect_auto,
             self.connect_only_contextual,
             playbook_compatible,
+            self.listen_protocol_api_uri + self.listen_protocol_api_path,
         )
         connector_configuration = self.api.connector.register(self.connector)
         self.connector_logger.info(
@@ -1441,9 +1582,14 @@ class OpenCTIConnectorHelper:  # pylint: disable=too-many-public-methods
 
         self.listen_queue = ListenQueue(
             self,
+            self.opencti_token,
             self.config,
             self.connector_config,
             self.applicant_id,
+            self.listen_protocol,
+            self.listen_protocol_api_ssl,
+            self.listen_protocol_api_path,
+            self.listen_protocol_api_port,
             message_callback,
         )
         self.listen_queue.start()
@@ -1742,13 +1888,13 @@ class OpenCTIConnectorHelper:  # pylint: disable=too-many-public-methods
             raise ValueError("Nothing to import")
 
         if bundle_send_to_queue:
-            if work_id:
-                self.api.work.add_expectations(work_id, expectations_number)
-                if draft_id:
-                    self.api.work.add_draft_context(work_id, draft_id)
+            if work_id and draft_id:
+                self.api.work.add_draft_context(work_id, draft_id)
             if entities_types is None:
                 entities_types = []
             if self.queue_protocol == "amqp":
+                if work_id:
+                    self.api.work.add_expectations(work_id, expectations_number)
                 pika_credentials = pika.PlainCredentials(
                     self.connector_config["connection"]["user"],
                     self.connector_config["connection"]["pass"],
@@ -1791,7 +1937,7 @@ class OpenCTIConnectorHelper:  # pylint: disable=too-many-public-methods
                 pika_connection.close()
             elif self.queue_protocol == "api":
                 self.api.send_bundle_to_api(
-                    connector_id=self.connector_id, bundle=bundle
+                    connector_id=self.connector_id, bundle=bundle, work_id=work_id
                 )
             else:
                 raise ValueError(
