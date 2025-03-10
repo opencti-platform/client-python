@@ -912,6 +912,20 @@ class OpenCTIConnectorHelper:  # pylint: disable=too-many-public-methods
             False,
             False,
         )
+        metrics_namespace = get_config_variable(
+            "CONNECTOR_METRICS_NAMESPACE",
+            ["connector", "metrics_namespace"],
+            config,
+            False,
+            "",
+        )
+        metrics_subsystem = get_config_variable(
+            "CONNECTOR_METRICS_SUBSYSTEM",
+            ["connector", "metrics_subsystem"],
+            config,
+            False,
+            "",
+        )
         metrics_port = get_config_variable(
             "CONNECTOR_METRICS_PORT", ["connector", "metrics_port"], config, True, 9095
         )
@@ -946,7 +960,11 @@ class OpenCTIConnectorHelper:  # pylint: disable=too-many-public-methods
         # For retro compatibility
 
         self.metric = OpenCTIMetricHandler(
-            self.connector_logger, expose_metrics, metrics_port
+            self.connector_logger,
+            expose_metrics,
+            metrics_namespace,
+            metrics_subsystem,
+            metrics_port,
         )
         # Register the connector in OpenCTI
         self.connector = OpenCTIConnector(
